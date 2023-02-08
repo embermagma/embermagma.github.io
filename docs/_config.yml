@@ -23,12 +23,12 @@ baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://embermagma.github.io"
 domain: embermagma.github.io
 baseurl: 
-twitter_username: username
-github_username:  username
+twitter_username: embermagma  
+github_username:  embermagma
 
 # Build settings
 markdown: kramdown
-theme: minima
+theme: jekyll-theme-so-simple
 plugins:
 search: true
 include:
@@ -36,6 +36,14 @@ include:
 plugins: 
   - jekyll-feed
   
+sidebar:
+        nav: "posts"
+category_archive:
+  type: liquid
+  path: /categories/
+tag_archive:
+  type: liquid
+  path: /tags/
 
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
