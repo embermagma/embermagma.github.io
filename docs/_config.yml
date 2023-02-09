@@ -14,8 +14,7 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 remote_theme: "mmistakes/so-simple-theme@3.2.0"
-
-locale: en-US
+domain: embermagma.github.io
 title: Amber
 description: Not an artist, or much of anything else- just doing things. 
 baseurl: "" # the subpath of your site, e.g. /blog
@@ -32,9 +31,14 @@ twitter:
   username: "embermagma"  
 github:
   username:  "embermagma"
-  
+search: true  
 liquid:
   error_mode: strict
+
+feed:
+  path: atom.xml
+sidebar:
+        nav: "posts"
 
 permalink: /:categories/:title/
 markdown: kramdown
@@ -44,7 +48,7 @@ feed:
 search_full_content: false
 
 category_archive_path: "/categories/#"
-
+layout: collection
 plugins: 
   - jekyll-seo-tag
   - jekyll-sitemap
