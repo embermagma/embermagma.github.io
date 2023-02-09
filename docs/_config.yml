@@ -32,11 +32,14 @@ markdown: kramdown
 remote_theme: "mmistakes/so-simple-theme@3.2.0"
 plugins:
 search: true
+
 include:
   - _pages
 plugins: 
   - jekyll-feed
   
+feed:
+  path: atom.xml
 sidebar:
         nav: "posts"
 category_archive:
@@ -54,6 +57,7 @@ defaults:
     values:
       layout: post
       share: true
+      
 category_archive_path: "/categories/#"
 tag_archive_path: "/tags/#"
 layout: collection
@@ -61,9 +65,9 @@ entries_layout: grid
 collections:
   art:
     output: true
-    permalink: /:collection/:path/
+    permalink: /art
 footer_links:
-  - title: Twitter
+    title: Twitter
     url: https://twitter.com/embermagma
 
 # Exclude from processing.
