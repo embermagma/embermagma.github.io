@@ -58,6 +58,13 @@ category_archive_path: "/categories/#"
 tag_archive_path: "/tags/#"
 layout: collection
 entries_layout: grid
+collections:
+  art:
+    output: true
+    permalink: /:collection/:path/
+footer_links:
+  - title: Twitter
+    url: https://twitter.com/embermagma
 
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
