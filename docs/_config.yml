@@ -13,9 +13,9 @@
 # you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
+title: Amber
 remote_theme: "mmistakes/so-simple-theme@3.2.0"
 domain: embermagma.github.io
-title: Amber
 description: Not an artist, or much of anything else- just doing things. 
 baseurl: "" # the subpath of your site, e.g. /blog
 skin: "/assets/css/skins/dark.css"
