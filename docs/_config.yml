@@ -18,6 +18,7 @@ email:
 description: >- # this means to ignore newlines until "baseurl:"
   Not an artist, or much of anything else- just doing things. 
 baseurl: "" # the subpath of your site, e.g. /blog
+skin: "/assets/css/skins/dark.css"
 url: "https://embermagma.github.io"
 domain: embermagma.github.io
 baseurl: 
@@ -53,6 +54,10 @@ defaults:
     values:
       layout: post
       share: true
+category_archive_path: "/categories/#"
+tag_archive_path: "/tags/#"
+layout: collection
+entries_layout: grid
 
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
