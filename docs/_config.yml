@@ -16,16 +16,16 @@
 title: Amber
 email: 
 description: >- # this means to ignore newlines until "baseurl:"
-  Write an awesome description for your new site here. You can edit this
-  line in _config.yml. It will appear in your document head meta (for
-  Google search results) and in your feed.xml site description.
+  Not an artist, or much of anything else- just doing things. 
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://embermagma.github.io"
 domain: embermagma.github.io
 baseurl: 
-twitter_username: embermagma  
-github_username:  embermagma
-
+twitter:
+  username: embermagma  
+github:
+  username:  embermagma
+logo: # path of site logo, e.g. "/images/logo.png"
 # Build settings
 markdown: kramdown
 remote_theme: "mmistakes/so-simple-theme@3.2.0"
@@ -44,6 +44,15 @@ category_archive:
 tag_archive:
   type: liquid
   path: /tags/
+  
+defaults:
+  # Posts defaults
+  - scope:
+      path: "_posts"
+      type: posts
+    values:
+      layout: post
+      share: true
 
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
