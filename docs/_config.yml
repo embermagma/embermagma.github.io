@@ -35,6 +35,28 @@ include:
   - _pages
 plugins: 
   - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
+  - jekyll-redirect-from
+ collections:
+  art:
+    output: true
+    permalink: /:collection/:path/
+ 
+ defaults:
+  # Post defaults
+  - scope:
+      path: "_posts"
+      type: posts
+    values:
+      layout: post
+      share: true
+  # Recipe defaults
+  - scope:
+      path: "art"
+      type: recipes
+    values:
+      layout: post
 
 sidebar:
         nav: "posts"
@@ -54,7 +76,7 @@ collections:
 footer_links:
   - title: Twitter
     url: https://twitter.com/embermagma
-    icon: fas fa-rss-square
+    icon: fab fa-twitter-square
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
 # to override the default setting.
