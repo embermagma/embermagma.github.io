@@ -35,10 +35,6 @@ include:
   - _pages
 plugins: 
   - jekyll-feed
-  
-collections:
-  recipes:
-    output: true
    
  
  #defaults:
