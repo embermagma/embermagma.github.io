@@ -36,10 +36,10 @@ include:
 plugins: 
   - jekyll-feed
   
- collections:
-  art:
+collections:
+  recipes:
     output: true
-    permalink: /:collection/:path/
+   
  
  #defaults:
   # Post defaults
