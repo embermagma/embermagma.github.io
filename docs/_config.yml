@@ -39,7 +39,7 @@ plugins:
 sidebar:
         nav: "posts"
 category_archive:
-@@ -54,16 +57,17 @@ defaults:
+##@@ -54,16 +57,17 @@ defaults:
     values:
       layout: post
       share: true
