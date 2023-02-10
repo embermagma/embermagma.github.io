@@ -35,15 +35,13 @@ include:
   - _pages
 plugins: 
   - jekyll-feed
-  - jekyll-seo-tag
-  - jekyll-sitemap
-  - jekyll-redirect-from
+  
  collections:
   art:
     output: true
     permalink: /:collection/:path/
  
- defaults:
+ #defaults:
   # Post defaults
   - scope:
       path: "_posts"
