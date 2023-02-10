@@ -14,6 +14,7 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 title: Amber
+email:
 remote_theme: "mmistakes/so-simple-theme@3.2.0"
 domain: embermagma.github.io
 description: Not an artist, or much of anything else- just doing things. 
@@ -35,6 +36,9 @@ search: true
 liquid:
   error_mode: strict
 
+include:
+  - _pages
+
 feed:
   path: atom.xml
 sidebar:
@@ -48,6 +52,7 @@ feed:
 search_full_content: false
 
 category_archive_path: "/categories/#"
+tag_archive_path: "/tags/#"
 layout: collection
 plugins: 
   - jekyll-seo-tag
