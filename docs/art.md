@@ -1,7 +1,8 @@
 ---
 layout: collection
-title: “ART” 
+title: ART
 collection: art 
-permalink: /embermagma.github.io/art
+permalink: /art/
 entries_layout: grid
 ---
+Listing for collection _art
