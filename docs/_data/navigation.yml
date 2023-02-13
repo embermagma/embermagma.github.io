@@ -1,0 +1,10 @@
+#set up navigation bar 
+
+- title: Posts
+  url: /posts/
+- title: Recipes
+  url: /recipes/
+- title: Art Works
+  url: /art/
+- title: Notebooks
+  url: /notebooks/
