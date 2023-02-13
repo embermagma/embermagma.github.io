@@ -1,6 +1,6 @@
 ---
 layout: collection
-title: ART
+title: Creative Works 
 collection: art 
 permalink: /art/
 entries_layout: grid
