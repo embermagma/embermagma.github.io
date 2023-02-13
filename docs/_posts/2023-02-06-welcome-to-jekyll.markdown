@@ -3,6 +3,7 @@ layout: post
 title:  "Under Construction!"
 date:   2023-02-10 14:13:16 -0700
 categories: Post
+collection: art
 ---
 
 This website is being created during the month of February, 2023. Powered by jekyll and github pages- using the So Simple theme.
