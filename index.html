@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>My Tasks</title>
+
+  <!-- PWA -->
+  <meta name="theme-color" content="#080f1a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="My Tasks" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- React -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #080f1a;
+      color: #e2e8f0;
+      font-family: 'DM Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior: none;
+    }
+    select, input, button { font-family: inherit; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 99px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+
+    // ─────────────────────────────────────────────
+    // CONFIG — update these before uploading
+    // ─────────────────────────────────────────────
+    const CORRECT_PIN   = "607725";
+    const SUPABASE_URL  = "YOUR_SUPABASE_URL";
+    const SUPABASE_KEY  = "YOUR_SUPABASE_ANON_KEY";
+    const PIN_TTL_DAYS  = 7; // how long before phone asks for PIN again
+
+    // ─────────────────────────────────────────────
+    // SUPABASE CLIENT
+    // ─────────────────────────────────────────────
+    const db = (SUPABASE_URL !== "YOUR_SUPABASE_URL")
+      ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+      : null;
+
+    // ─────────────────────────────────────────────
+    // CONSTANTS
+    // ─────────────────────────────────────────────
+    const CATEGORIES = ["Work","Personal","Health","Learning","Home"];
+    const PRIORITIES = ["Low","Medium","High"];
+    const PRIORITY_COLOR = { Low:"#4ade80", Medium:"#facc15", High:"#f87171" };
+    const CAT_COLOR = { Work:"#60a5fa", Personal:"#c084fc", Health:"#34d399", Learning:"#fb923c", Home:"#f472b6" };
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayStr = today.toISOString().slice(0,10);
+    const parseLocal = s => { const d=new Date(s+"T00:00:00"); d.setHours(0,0,0,0); return d; };
+
+    // ─────────────────────────────────────────────
+    // PIN LOCK
+    // ─────────────────────────────────────────────
+    function isPinValid() {
+      try {
+        const stored = localStorage.getItem("pin_unlocked");
+        if (!stored) return false;
+        const { ts } = JSON.parse(stored);
+        return Date.now() - ts < PIN_TTL_DAYS * 86400000;
+      } catch { return false; }
+    }
+
+    function savePinUnlock() {
+      localStorage.setItem("pin_unlocked", JSON.stringify({ ts: Date.now() }));
+    }
+
+    function PinLock({ onUnlock }) {
+      const [pin, setPin]       = React.useState("");
+      const [shake, setShake]   = React.useState(false);
+      const [locked, setLocked] = React.useState(false);
+      const [attempts, setAttempts] = React.useState(0);
+
+      function handleKey(k) {
+        if (locked) return;
+        if (k === "del") { setPin(p => p.slice(0,-1)); return; }
+        const next = pin + k;
+        setPin(next);
+        if (next.length === CORRECT_PIN.length) {
+          if (next === CORRECT_PIN) {
+            savePinUnlock();
+            onUnlock();
+          } else {
+            setShake(true);
+            setTimeout(() => { setPin(""); setShake(false); }, 600);
+            const a = attempts + 1;
+            setAttempts(a);
+            if (a >= 5) {
+              setLocked(true);
+              setTimeout(() => { setLocked(false); setAttempts(0); }, 30000);
+            }
+          }
+        }
+      }
+
+      const dots = Array.from({ length: CORRECT_PIN.length }, (_,i) => (
+        <div key={i} style={{
+          width: 14, height: 14, borderRadius: "50%",
+          background: i < pin.length ? "#6366f1" : "transparent",
+          border: i < pin.length ? "2px solid #6366f1" : "2px solid #334155",
+          transition: "all 0.15s ease",
+        }} />
+      ));
+
+      return (
+        <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:32, background:"#080f1a" }}>
+          <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:32, color:"#e2e8f0", marginBottom:6 }}>My Tasks</div>
+          <div style={{ color:"#475569", fontSize:13, marginBottom:48 }}>Enter your PIN to continue</div>
+
+          {/* Dots */}
+          <div style={{
+            display:"flex", gap:16, marginBottom:40,
+            animation: shake ? "shake 0.5s ease" : "none",
+          }}>{dots}</div>
+
+          {locked && (
+            <div style={{ color:"#f87171", fontSize:12, marginBottom:20, background:"#7f1d1d22", padding:"6px 16px", borderRadius:99 }}>
+              Too many attempts — wait 30 seconds
+            </div>
+          )}
+
+          {/* Keypad */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, maxWidth:240, width:"100%" }}>
+            {["1","2","3","4","5","6","7","8","9","","0","del"].map((k,i) => (
+              k === "" ? <div key={i}/> : (
+                <button key={k} onClick={() => handleKey(k)}
+                  disabled={locked}
+                  style={{
+                    background: k==="del" ? "#1e293b" : "#111827",
+                    border: "1px solid #1e293b",
+                    borderRadius: 14,
+                    color: k==="del" ? "#64748b" : "#e2e8f0",
+                    fontSize: k==="del" ? 18 : 22,
+                    fontWeight: 600,
+                    padding: "18px 0",
+                    cursor: locked ? "not-allowed" : "pointer",
+                    opacity: locked ? 0.4 : 1,
+                    transition: "background 0.1s",
+                    WebkitTapHighlightColor: "transparent",
+                  }}>
+                  {k === "del" ? "⌫" : k}
+                </button>
+              )
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────
+    // SMALL COMPONENTS
+    // ─────────────────────────────────────────────
+    function Pill({ color, children }) {
+      return <span style={{ background:color+"22", color, border:`1px solid ${color}55`, borderRadius:99, padding:"1px 9px", fontSize:11, fontWeight:600, letterSpacing:0.3, whiteSpace:"nowrap" }}>{children}</span>;
+    }
+
+    function ProgressBar({ pct, color="#a78bfa", label }) {
+      return (
+        <div>
+          {label && <div style={{ fontSize:12, color:"#94a3b8", marginBottom:4 }}>{label}</div>}
+          <div style={{ background:"#1e293b", borderRadius:99, height:10, overflow:"hidden" }}>
+            <div style={{ width:`${pct}%`, background:`linear-gradient(90deg,${color},${color}99)`, height:"100%", borderRadius:99, transition:"width 0.6s ease" }} />
+          </div>
+          <div style={{ fontSize:11, color:"#64748b", marginTop:3, textAlign:"right" }}>{Math.round(pct)}%</div>
+        </div>
+      );
+    }
+
+    function Spinner() {
+      return (
+        <div style={{ display:"flex", justifyContent:"center", padding:"60px 0" }}>
+          <div style={{ width:32, height:32, borderRadius:"50%", border:"3px solid #1e293b", borderTopColor:"#6366f1", animation:"spin 0.7s linear infinite" }} />
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────
+    // SETUP SCREEN (Supabase not configured yet)
+    // ─────────────────────────────────────────────
+    function SetupScreen() {
+      return (
+        <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:24 }}>
+          <div style={{ maxWidth:400, width:"100%", animation:"fadeIn 0.4s ease" }}>
+            <div style={{ fontFamily:"'DM Serif Display',serif", fontSize:28, color:"#e2e8f0", marginBottom:8 }}>One more step.</div>
+            <div style={{ color:"#64748b", fontSize:14, lineHeight:1.7, marginBottom:24 }}>
+              Click the pencil icon on <code style={{ background:"#1e293b", padding:"1px 6px", borderRadius:4, color:"#a5b4fc" }}>index.html</code> in your GitHub <code style={{ background:"#1e293b", padding:"1px 6px", borderRadius:4, color:"#a5b4fc" }}>docs</code> folder and replace:
+            </div>
+            {[
+              ["YOUR_SUPABASE_URL", "Project URL — Supabase → Settings → API"],
+              ["YOUR_SUPABASE_ANON_KEY", "anon/public key — same page"],
+            ].map(([k,d]) => (
+              <div key={k} style={{ background:"#111827", border:"1px solid #1e293b", borderRadius:10, padding:14, marginBottom:10 }}>
+                <code style={{ color:"#f87171", fontSize:13 }}>{k}</code>
+                <div style={{ color:"#475569", fontSize:12, marginTop:4 }}>{d}</div>
+              </div>
+            ))}
+            <div style={{ color:"#334155", fontSize:12, marginTop:16, lineHeight:1.7 }}>
+              Don't have a Supabase project yet? Go to supabase.com → New Project → Table Editor → create a table called <strong style={{ color:"#475569" }}>tasks</strong> with columns: title (text), due (text), category (text), priority (text), done (bool), notes (text).
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────
+    // MODAL
+    // ─────────────────────────────────────────────
+    function Modal({ task, onSave, onClose, onDelete, saving }) {
+      const [t, setT] = React.useState({...task});
+      const isNew = !task.id;
+      return (
+        <div style={{ position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16 }} onClick={onClose}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:"#0f172a",border:"1px solid #1e293b",borderRadius:16,padding:24,width:"100%",maxWidth:420,boxShadow:"0 25px 60px #0008",animation:"fadeIn 0.2s ease" }}>
+            <div style={{ fontSize:16,fontWeight:700,color:"#e2e8f0",marginBottom:18,fontFamily:"'DM Serif Display',serif" }}>{isNew?"New Task":"Edit Task"}</div>
+            {[["Title","title","text"],["Notes","notes","text"],["Due Date","due","date"]].map(([label,key,type])=>(
+              <div key={key} style={{ marginBottom:12 }}>
+                <div style={{ fontSize:11,color:"#64748b",marginBottom:4,textTransform:"uppercase",letterSpacing:0.8 }}>{label}</div>
+                <input type={type} value={t[key]||""} onChange={e=>setT({...t,[key]:e.target.value})}
+                  style={{ width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"8px 12px",color:"#e2e8f0",fontSize:14,outline:"none" }}/>
+              </div>
+            ))}
+            <div style={{ display:"flex",gap:10,marginBottom:12 }}>
+              {[["Category","category",CATEGORIES],["Priority","priority",PRIORITIES]].map(([label,key,opts])=>(
+                <div key={key} style={{ flex:1 }}>
+                  <div style={{ fontSize:11,color:"#64748b",marginBottom:4,textTransform:"uppercase",letterSpacing:0.8 }}>{label}</div>
+                  <select value={t[key]} onChange={e=>setT({...t,[key]:e.target.value})}
+                    style={{ width:"100%",background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13 }}>
+                    {opts.map(o=><option key={o}>{o}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:"flex",gap:8,marginTop:20 }}>
+              <button onClick={()=>onSave(t)} disabled={saving||!t.title?.trim()} style={{ flex:1,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff",border:"none",borderRadius:8,padding:"10px 0",fontWeight:700,fontSize:14,cursor:"pointer",opacity:saving?0.6:1 }}>
+                {saving?"Saving…":"Save"}
+              </button>
+              {!isNew&&<button onClick={()=>onDelete(t.id)} style={{ background:"#7f1d1d33",color:"#f87171",border:"1px solid #7f1d1d",borderRadius:8,padding:"10px 14px",cursor:"pointer",fontSize:13 }}>Del</button>}
+              <button onClick={onClose} style={{ background:"#1e293b",color:"#94a3b8",border:"1px solid #334155",borderRadius:8,padding:"10px 14px",cursor:"pointer",fontSize:13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────
+    // CALENDAR
+    // ─────────────────────────────────────────────
+    function CalendarView({ tasks, onDayClick }) {
+      const [cursor, setCursor] = React.useState({ year:today.getFullYear(), month:today.getMonth() });
+      const { year, month } = cursor;
+      const tasksByDay = React.useMemo(()=>{
+        const m={};
+        tasks.forEach(t=>{ if(!t.due) return; if(!m[t.due]) m[t.due]=[]; m[t.due].push(t); });
+        return m;
+      },[tasks]);
+      const days = new Date(year,month+1,0).getDate();
+      const firstDay = new Date(year,month,1).getDay();
+      const monthName = new Date(year,month,1).toLocaleString("default",{month:"long"});
+      const cells = [...Array(firstDay).fill(null),...Array.from({length:days},(_,i)=>i+1)];
+      const nav = d => { let m=month+d,y=year; if(m<0){m=11;y--;} if(m>11){m=0;y++;} setCursor({year:y,month:m}); };
+      return (
+        <div>
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16 }}>
+            <button onClick={()=>nav(-1)} style={{ background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontSize:16 }}>‹</button>
+            <span style={{ fontFamily:"'DM Serif Display',serif",fontSize:20,color:"#e2e8f0" }}>{monthName} {year}</span>
+            <button onClick={()=>nav(1)} style={{ background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontSize:16 }}>›</button>
+          </div>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:6 }}>
+            {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=><div key={d} style={{ textAlign:"center",fontSize:11,color:"#475569",fontWeight:700 }}>{d}</div>)}
+          </div>
+          <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4 }}>
+            {cells.map((d,i)=>{
+              if(!d) return <div key={`e${i}`}/>;
+              const ds=`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+              const dt=tasksByDay[ds]||[];
+              const isToday=ds===todayStr;
+              return (
+                <div key={d} onClick={()=>onDayClick(ds,dt)}
+                  style={{ background:isToday?"#312e81":dt.length?"#1e293b":"#0f172a",border:isToday?"1px solid #6366f1":"1px solid #1e293b",borderRadius:10,padding:"6px 4px",minHeight:56,cursor:"pointer" }}>
+                  <div style={{ fontSize:13,color:isToday?"#a5b4fc":"#94a3b8",fontWeight:isToday?700:400,textAlign:"right",paddingRight:4 }}>{d}</div>
+                  <div style={{ display:"flex",flexWrap:"wrap",gap:2,marginTop:2,paddingLeft:2 }}>
+                    {dt.slice(0,3).map(t=><div key={t.id} style={{ width:8,height:8,borderRadius:"50%",background:t.done?"#334155":PRIORITY_COLOR[t.priority] }}/>)}
+                    {dt.length>3&&<div style={{ fontSize:9,color:"#475569" }}>+{dt.length-3}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display:"flex",gap:14,marginTop:14,flexWrap:"wrap" }}>
+            {PRIORITIES.map(p=><div key={p} style={{ display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#64748b" }}><div style={{ width:8,height:8,borderRadius:"50%",background:PRIORITY_COLOR[p] }}/>{p}</div>)}
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────
+    // TASK LIST
+    // ─────────────────────────────────────────────
+    function TaskList({ tasks, onToggle, onEdit, onAdd }) {
+      const [filter, setFilter] = React.useState("All");
+      const [catFilter, setCatFilter] = React.useState("All");
+      const sorted = [...tasks]
+        .filter(t=>(filter==="All"||(filter==="Done"?t.done:!t.done))&&(catFilter==="All"||t.category===catFilter))
+        .sort((a,b)=>{ if(a.done!==b.done) return a.done?1:-1; return (a.due||"").localeCompare(b.due||""); });
+      return (
+        <div>
+          <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:14 }}>
+            {["All","Pending","Done"].map(s=>(
+              <button key={s} onClick={()=>setFilter(s)} style={{ background:filter===s?"#6366f1":"#1e293b",color:filter===s?"#fff":"#64748b",border:filter===s?"1px solid #6366f1":"1px solid #334155",borderRadius:99,padding:"4px 14px",fontSize:12,fontWeight:600,cursor:"pointer" }}>{s}</button>
+            ))}
+            <div style={{ flex:1 }}/>
+            <select value={catFilter} onChange={e=>setCatFilter(e.target.value)}
+              style={{ background:"#1e293b",border:"1px solid #334155",borderRadius:8,padding:"4px 10px",color:"#94a3b8",fontSize:12 }}>
+              <option>All</option>
+              {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
+            {sorted.map(t=>{
+              const overdue=t.due&&parseLocal(t.due)<today&&!t.done;
+              return (
+                <div key={t.id} onClick={()=>onEdit(t)}
+                  style={{ background:t.done?"#0c1420":"#111827",border:`1px solid ${overdue?"#7f1d1d":"#1e293b"}`,borderLeft:`3px solid ${t.done?"#1e293b":PRIORITY_COLOR[t.priority]}`,borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",opacity:t.done?0.55:1 }}>
+                  <div onClick={e=>{e.stopPropagation();onToggle(t.id,t.done);}}
+                    style={{ width:20,height:20,borderRadius:6,flexShrink:0,border:t.done?"2px solid #4ade80":"2px solid #334155",background:t.done?"#4ade8022":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer" }}>
+                    {t.done&&<span style={{ color:"#4ade80",fontSize:12,lineHeight:1 }}>✓</span>}
+                  </div>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <div style={{ fontSize:14,color:t.done?"#475569":"#e2e8f0",fontWeight:600,textDecoration:t.done?"line-through":"none",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{t.title}</div>
+                    <div style={{ display:"flex",gap:6,marginTop:4,flexWrap:"wrap",alignItems:"center" }}>
+                      <Pill color={CAT_COLOR[t.category]}>{t.category}</Pill>
+                      {t.due&&<span style={{ fontSize:11,color:overdue?"#f87171":"#475569" }}>{overdue?"⚠ ":""}{t.due}</span>}
+                      {t.notes&&<span style={{ fontSize:11,color:"#334155",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:120 }}>· {t.notes}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {sorted.length===0&&<div style={{ textAlign:"center",color:"#334155",padding:"40px 0",fontSize:14 }}>No tasks here yet.</div>}
+          <button onClick={onAdd} style={{ marginTop:16,width:"100%",background:"linear-gradient(135deg,#6366f133,#8b5cf633)",border:"1px dashed #6366f155",borderRadius:10,padding:"12px 0",color:"#818cf8",fontWeight:700,fontSize:14,cursor:"pointer" }}>+ Add Task</button>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────
+    // DASHBOARD
+    // ─────────────────────────────────────────────
+    function Dashboard({ tasks }) {
+      const total=tasks.length, done=tasks.filter(t=>t.done).length;
+      const pct=total?(done/total)*100:0;
+      const overdue=tasks.filter(t=>!t.done&&t.due&&parseLocal(t.due)<today).length;
+      const upcoming=tasks.filter(t=>{ if(t.done||!t.due) return false; const d=(parseLocal(t.due)-today)/86400000; return d>=0&&d<=7; }).length;
+      const byCat=CATEGORIES.map(cat=>{ const s=tasks.filter(t=>t.category===cat),dc=s.filter(t=>t.done).length; return {cat,total:s.length,done:dc,pct:s.length?(dc/s.length)*100:0}; }).filter(c=>c.total>0);
+      const byPri=PRIORITIES.map(p=>({p,count:tasks.filter(t=>t.priority===p&&!t.done).length}));
+      function exportJSON() {
+        const a=document.createElement("a");
+        a.href=URL.createObjectURL(new Blob([JSON.stringify(tasks,null,2)],{type:"application/json"}));
+        a.download="tasks.json"; a.click();
+      }
+      return (
+        <div style={{ display:"flex",flexDirection:"column",gap:16 }}>
+          <div style={{ background:"#111827",border:"1px solid #1e293b",borderRadius:12,padding:20 }}>
+            <div style={{ fontSize:12,color:"#64748b",marginBottom:12,textTransform:"uppercase",letterSpacing:1,fontWeight:700 }}>Overall Progress</div>
+            <div style={{ display:"flex",gap:16,marginBottom:16 }}>
+              {[["Total",total,"#6366f1"],["Done",done,"#4ade80"],["Overdue",overdue,"#f87171"],["Due Soon",upcoming,"#facc15"]].map(([l,v,c])=>(
+                <div key={l} style={{ textAlign:"center",flex:1 }}>
+                  <div style={{ fontSize:26,fontWeight:800,color:c,fontFamily:"'DM Serif Display',serif" }}>{v}</div>
+                  <div style={{ fontSize:11,color:"#475569" }}>{l}</div>
+                </div>
+              ))}
+            </div>
+            <ProgressBar pct={pct} color="#6366f1" label={`${done} of ${total} completed`}/>
+          </div>
+          <div style={{ background:"#111827",border:"1px solid #1e293b",borderRadius:12,padding:20 }}>
+            <div style={{ fontSize:12,color:"#64748b",marginBottom:14,textTransform:"uppercase",letterSpacing:1,fontWeight:700 }}>By Category</div>
+            <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
+              {byCat.map(({cat,total,done,pct})=>(
+                <div key={cat}>
+                  <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4 }}><Pill color={CAT_COLOR[cat]}>{cat}</Pill><span style={{ fontSize:11,color:"#475569" }}>{done}/{total}</span></div>
+                  <ProgressBar pct={pct} color={CAT_COLOR[cat]}/>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background:"#111827",border:"1px solid #1e293b",borderRadius:12,padding:20 }}>
+            <div style={{ fontSize:12,color:"#64748b",marginBottom:14,textTransform:"uppercase",letterSpacing:1,fontWeight:700 }}>Pending by Priority</div>
+            <div style={{ display:"flex",gap:10,alignItems:"flex-end",height:80 }}>
+              {byPri.map(({p,count})=>{ const mx=Math.max(...byPri.map(x=>x.count),1),h=Math.max((count/mx)*64,count?6:0); return (
+                <div key={p} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4 }}>
+                  <div style={{ fontSize:13,color:PRIORITY_COLOR[p],fontWeight:700 }}>{count}</div>
+                  <div style={{ width:"60%",height:h,background:PRIORITY_COLOR[p]+"44",border:`1px solid ${PRIORITY_COLOR[p]}66`,borderRadius:"4px 4px 0 0",alignSelf:"flex-end" }}/>
+                  <div style={{ fontSize:10,color:"#475569" }}>{p}</div>
+                </div>
+              );})}
+            </div>
+          </div>
+          <div style={{ background:"#111827",border:"1px solid #1e293b",borderRadius:12,padding:20 }}>
+            <div style={{ fontSize:12,color:"#64748b",marginBottom:8,textTransform:"uppercase",letterSpacing:1,fontWeight:700 }}>Jupyter Export</div>
+            <div style={{ fontSize:12,color:"#475569",marginBottom:12,lineHeight:1.6 }}>
+              Download as <code style={{ background:"#1e293b",padding:"1px 5px",borderRadius:4,color:"#a5b4fc" }}>tasks.json</code> then: <code style={{ background:"#1e293b",padding:"1px 5px",borderRadius:4,color:"#a5b4fc" }}>pd.read_json("tasks.json")</code>
+            </div>
+            <button onClick={exportJSON} style={{ width:"100%",background:"linear-gradient(135deg,#0f766e,#0d9488)",color:"#fff",border:"none",borderRadius:8,padding:"11px 0",fontWeight:700,fontSize:14,cursor:"pointer" }}>⬇ Export tasks.json</button>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────
+    // DAY SHEET
+    // ─────────────────────────────────────────────
+    function DaySheet({ dateStr, tasks, onClose, onEdit, onToggle, onAdd }) {
+      const label=new Date(dateStr+"T00:00:00").toLocaleDateString("default",{weekday:"long",month:"long",day:"numeric"});
+      return (
+        <div style={{ position:"fixed",inset:0,background:"#00000099",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center" }} onClick={onClose}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:"#0f172a",borderRadius:"16px 16px 0 0",border:"1px solid #1e293b",width:"100%",maxWidth:480,padding:20,maxHeight:"70vh",overflowY:"auto" }}>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
+              <div style={{ fontFamily:"'DM Serif Display',serif",color:"#e2e8f0",fontSize:18 }}>{label}</div>
+              <button onClick={onClose} style={{ background:"none",border:"none",color:"#64748b",fontSize:20,cursor:"pointer" }}>×</button>
+            </div>
+            {tasks.length===0&&<div style={{ color:"#334155",fontSize:13,textAlign:"center",padding:"20px 0" }}>Nothing due this day.</div>}
+            {tasks.map(t=>(
+              <div key={t.id} onClick={()=>{onEdit(t);onClose();}}
+                style={{ background:"#111827",borderLeft:`3px solid ${PRIORITY_COLOR[t.priority]}`,borderRadius:8,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:10,cursor:"pointer" }}>
+                <div onClick={e=>{e.stopPropagation();onToggle(t.id,t.done);}}
+                  style={{ width:18,height:18,borderRadius:5,flexShrink:0,border:t.done?"2px solid #4ade80":"2px solid #334155",background:t.done?"#4ade8022":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer" }}>
+                  {t.done&&<span style={{ color:"#4ade80",fontSize:11 }}>✓</span>}
+                </div>
+                <div>
+                  <div style={{ fontSize:13,color:t.done?"#475569":"#e2e8f0",fontWeight:600,textDecoration:t.done?"line-through":"none" }}>{t.title}</div>
+                  <Pill color={CAT_COLOR[t.category]}>{t.category}</Pill>
+                </div>
+              </div>
+            ))}
+            <button onClick={()=>{onAdd(dateStr);onClose();}} style={{ width:"100%",background:"#1e293b",border:"1px dashed #334155",borderRadius:8,padding:"10px 0",color:"#475569",cursor:"pointer",fontSize:13,marginTop:4 }}>
+              + Add task for this day
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────
+    // MAIN APP
+    // ─────────────────────────────────────────────
+    function TaskApp() {
+      const [tasks, setTasks]   = React.useState([]);
+      const [loading, setLoading] = React.useState(true);
+      const [tab, setTab]       = React.useState("tasks");
+      const [modal, setModal]   = React.useState(null);
+      const [daySheet, setDaySheet] = React.useState(null);
+      const [saving, setSaving] = React.useState(false);
+
+      React.useEffect(()=>{
+        if(!db){ setLoading(false); return; }
+        db.from("tasks").select("*").order("due",{ascending:true,nullsFirst:false}).then(({data,error})=>{
+          if(!error) setTasks(data||[]);
+          setLoading(false);
+        });
+      },[]);
+
+      async function toggleDone(id, currentDone) {
+        const next=!currentDone;
+        setTasks(p=>p.map(t=>t.id===id?{...t,done:next}:t));
+        await db.from("tasks").update({done:next}).eq("id",id);
+      }
+
+      async function saveTask(t) {
+        setSaving(true);
+        if(!t.id) {
+          const {data,error}=await db.from("tasks").insert([{title:t.title,due:t.due||null,category:t.category,priority:t.priority,done:false,notes:t.notes||""}]).select();
+          if(!error&&data) setTasks(p=>[...p,data[0]]);
+        } else {
+          await db.from("tasks").update({title:t.title,due:t.due||null,category:t.category,priority:t.priority,notes:t.notes||""}).eq("id",t.id);
+          setTasks(p=>p.map(x=>x.id===t.id?{...x,...t}:x));
+        }
+        setSaving(false); setModal(null);
+      }
+
+      async function deleteTask(id) {
+        await db.from("tasks").delete().eq("id",id);
+        setTasks(p=>p.filter(t=>t.id!==id));
+        setModal(null);
+      }
+
+      const openNew = (due="") => setModal({id:null,title:"",due,category:"Personal",priority:"Medium",done:false,notes:""});
+
+      if(!db) return <SetupScreen/>;
+
+      const TABS=[{key:"tasks",label:"Tasks",icon:"☑"},{key:"calendar",label:"Calendar",icon:"📅"},{key:"dash",label:"Dashboard",icon:"📊"}];
+
+      return (
+        <div style={{ minHeight:"100vh",background:"#080f1a" }}>
+          <div style={{ padding:"20px 20px 0",borderBottom:"1px solid #1e293b",background:"#080f1aee",position:"sticky",top:0,zIndex:10 }}>
+            <div style={{ fontFamily:"'DM Serif Display',serif",fontSize:24,color:"#e2e8f0",marginBottom:14 }}>My Tasks</div>
+            <div style={{ display:"flex" }}>
+              {TABS.map(({key,label,icon})=>(
+                <button key={key} onClick={()=>setTab(key)} style={{ flex:1,background:"none",border:"none",borderBottom:tab===key?"2px solid #6366f1":"2px solid transparent",color:tab===key?"#a5b4fc":"#475569",padding:"8px 0 10px",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5 }}>
+                  <span>{icon}</span>{label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ padding:16,maxWidth:520,margin:"0 auto",paddingBottom:80 }}>
+            {loading ? <Spinner/> : (
+              <>
+                {tab==="tasks"&&<TaskList tasks={tasks} onToggle={toggleDone} onEdit={setModal} onAdd={()=>openNew()}/>}
+                {tab==="calendar"&&<CalendarView tasks={tasks} onDayClick={(ds,dt)=>setDaySheet({dateStr:ds,tasks:dt})}/>}
+                {tab==="dash"&&<Dashboard tasks={tasks}/>}
+              </>
+            )}
+          </div>
+          {tab!=="tasks"&&(
+            <button onClick={()=>openNew()} style={{ position:"fixed",bottom:24,right:24,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",width:52,height:52,borderRadius:"50%",border:"none",color:"#fff",fontSize:26,cursor:"pointer",boxShadow:"0 8px 24px #6366f155",display:"flex",alignItems:"center",justifyContent:"center" }}>+</button>
+          )}
+          {modal&&<Modal task={modal} onSave={saveTask} onClose={()=>setModal(null)} onDelete={deleteTask} saving={saving}/>}
+          {daySheet&&<DaySheet dateStr={daySheet.dateStr} tasks={daySheet.tasks} onClose={()=>setDaySheet(null)} onEdit={setModal} onToggle={toggleDone} onAdd={openNew}/>}
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────
+    // ROOT — PIN GATE
+    // ─────────────────────────────────────────────
+    function Root() {
+      const [unlocked, setUnlocked] = React.useState(isPinValid());
+      if(!unlocked) return <PinLock onUnlock={()=>setUnlocked(true)}/>;
+      return <TaskApp/>;
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<Root/>);
+
+    // Register service worker for PWA
+    if("serviceWorker" in navigator) {
+      window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js"));
+    }
+
+  </script>
+</body>
+</html>
