@@ -58,7 +58,7 @@
     // SUPABASE CLIENT
     // ─────────────────────────────────────────────
     const db = (SUPABASE_URL !== "YOUR_SUPABASE_URL")
-      ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
       : null;
 
     // ─────────────────────────────────────────────
