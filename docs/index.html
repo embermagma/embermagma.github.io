@@ -15,12 +15,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
 
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
-
   <!-- React -->
   <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.5/babel.min.js"></script>
 
   <style>
@@ -57,9 +55,11 @@
     // ─────────────────────────────────────────────
     // SUPABASE CLIENT
     // ─────────────────────────────────────────────
-    const db = (SUPABASE_URL !== "YOUR_SUPABASE_URL")
-      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-      : null;
+    function getDb() {
+      if (SUPABASE_URL === "YOUR_SUPABASE_URL") return null;
+      return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+    const db = getDb();
 
     // ─────────────────────────────────────────────
     // CONSTANTS
@@ -467,81 +467,83 @@
     // ─────────────────────────────────────────────
     // MAIN APP
     // ─────────────────────────────────────────────
-    function TaskApp() {
-      const [tasks, setTasks]   = React.useState([]);
-      const [loading, setLoading] = React.useState(true);
-      const [tab, setTab]       = React.useState("tasks");
-      const [modal, setModal]   = React.useState(null);
-      const [daySheet, setDaySheet] = React.useState(null);
-      const [saving, setSaving] = React.useState(false);
+function TaskApp() {
+  const client = React.useMemo(() => db || getDb(), []);
 
-      React.useEffect(()=>{
-        if(!db){ setLoading(false); return; }
-        db.from("tasks").select("*").order("due",{ascending:true,nullsFirst:false}).then(({data,error})=>{
-          if(!error) setTasks(data||[]);
-          setLoading(false);
-        });
-      },[]);
+  const [tasks, setTasks]     = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [tab, setTab]         = React.useState("tasks");
+  const [modal, setModal]     = React.useState(null);
+  const [daySheet, setDaySheet] = React.useState(null);
+  const [saving, setSaving]   = React.useState(false);
 
-      async function toggleDone(id, currentDone) {
-        const next=!currentDone;
-        setTasks(p=>p.map(t=>t.id===id?{...t,done:next}:t));
-        await db.from("tasks").update({done:next}).eq("id",id);
-      }
+  React.useEffect(()=>{
+    if(!client){ setLoading(false); return; }
+    client.from("tasks").select("*").order("due",{ascending:true,nullsFirst:false}).then(({data,error})=>{
+      if(!error) setTasks(data||[]);
+      setLoading(false);
+    });
+  },[]);
 
-      async function saveTask(t) {
-        setSaving(true);
-        if(!t.id) {
-          const {data,error}=await db.from("tasks").insert([{title:t.title,due:t.due||null,category:t.category,priority:t.priority,done:false,notes:t.notes||""}]).select();
-          if(!error&&data) setTasks(p=>[...p,data[0]]);
-        } else {
-          await db.from("tasks").update({title:t.title,due:t.due||null,category:t.category,priority:t.priority,notes:t.notes||""}).eq("id",t.id);
-          setTasks(p=>p.map(x=>x.id===t.id?{...x,...t}:x));
-        }
-        setSaving(false); setModal(null);
-      }
+  async function toggleDone(id, currentDone) {
+    const next=!currentDone;
+    setTasks(p=>p.map(t=>t.id===id?{...t,done:next}:t));
+    await client.from("tasks").update({done:next}).eq("id",id);
+  }
 
-      async function deleteTask(id) {
-        await db.from("tasks").delete().eq("id",id);
-        setTasks(p=>p.filter(t=>t.id!==id));
-        setModal(null);
-      }
-
-      const openNew = (due="") => setModal({id:null,title:"",due,category:"Personal",priority:"Medium",done:false,notes:""});
-
-      if(!db) return <SetupScreen/>;
-
-      const TABS=[{key:"tasks",label:"Tasks",icon:"☑"},{key:"calendar",label:"Calendar",icon:"📅"},{key:"dash",label:"Dashboard",icon:"📊"}];
-
-      return (
-        <div style={{ minHeight:"100vh",background:"#080f1a" }}>
-          <div style={{ padding:"20px 20px 0",borderBottom:"1px solid #1e293b",background:"#080f1aee",position:"sticky",top:0,zIndex:10 }}>
-            <div style={{ fontFamily:"'DM Serif Display',serif",fontSize:24,color:"#e2e8f0",marginBottom:14 }}>My Tasks</div>
-            <div style={{ display:"flex" }}>
-              {TABS.map(({key,label,icon})=>(
-                <button key={key} onClick={()=>setTab(key)} style={{ flex:1,background:"none",border:"none",borderBottom:tab===key?"2px solid #6366f1":"2px solid transparent",color:tab===key?"#a5b4fc":"#475569",padding:"8px 0 10px",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5 }}>
-                  <span>{icon}</span>{label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{ padding:16,maxWidth:520,margin:"0 auto",paddingBottom:80 }}>
-            {loading ? <Spinner/> : (
-              <>
-                {tab==="tasks"&&<TaskList tasks={tasks} onToggle={toggleDone} onEdit={setModal} onAdd={()=>openNew()}/>}
-                {tab==="calendar"&&<CalendarView tasks={tasks} onDayClick={(ds,dt)=>setDaySheet({dateStr:ds,tasks:dt})}/>}
-                {tab==="dash"&&<Dashboard tasks={tasks}/>}
-              </>
-            )}
-          </div>
-          {tab!=="tasks"&&(
-            <button onClick={()=>openNew()} style={{ position:"fixed",bottom:24,right:24,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",width:52,height:52,borderRadius:"50%",border:"none",color:"#fff",fontSize:26,cursor:"pointer",boxShadow:"0 8px 24px #6366f155",display:"flex",alignItems:"center",justifyContent:"center" }}>+</button>
-          )}
-          {modal&&<Modal task={modal} onSave={saveTask} onClose={()=>setModal(null)} onDelete={deleteTask} saving={saving}/>}
-          {daySheet&&<DaySheet dateStr={daySheet.dateStr} tasks={daySheet.tasks} onClose={()=>setDaySheet(null)} onEdit={setModal} onToggle={toggleDone} onAdd={openNew}/>}
-        </div>
-      );
+  async function saveTask(t) {
+    setSaving(true);
+    if(!t.id) {
+      const {data,error}=await client.from("tasks").insert([{title:t.title,due:t.due||null,category:t.category,priority:t.priority,done:false,notes:t.notes||""}]).select();
+      if(!error&&data) setTasks(p=>[...p,data[0]]);
+    } else {
+      await client.from("tasks").update({title:t.title,due:t.due||null,category:t.category,priority:t.priority,notes:t.notes||""}).eq("id",t.id);
+      setTasks(p=>p.map(x=>x.id===t.id?{...x,...t}:x));
     }
+    setSaving(false); setModal(null);
+  }
+
+  async function deleteTask(id) {
+    await client.from("tasks").delete().eq("id",id);
+    setTasks(p=>p.filter(t=>t.id!==id));
+    setModal(null);
+  }
+
+  const openNew = (due="") => setModal({id:null,title:"",due,category:"Personal",priority:"Medium",done:false,notes:""});
+
+  if(!client) return <SetupScreen/>;
+
+  const TABS=[{key:"tasks",label:"Tasks",icon:"☑"},{key:"calendar",label:"Calendar",icon:"📅"},{key:"dash",label:"Dashboard",icon:"📊"}];
+
+  return (
+    <div style={{ minHeight:"100vh",background:"#080f1a" }}>
+      <div style={{ padding:"20px 20px 0",borderBottom:"1px solid #1e293b",background:"#080f1aee",position:"sticky",top:0,zIndex:10 }}>
+        <div style={{ fontFamily:"'DM Serif Display',serif",fontSize:24,color:"#e2e8f0",marginBottom:14 }}>My Tasks</div>
+        <div style={{ display:"flex" }}>
+          {TABS.map(({key,label,icon})=>(
+            <button key={key} onClick={()=>setTab(key)} style={{ flex:1,background:"none",border:"none",borderBottom:tab===key?"2px solid #6366f1":"2px solid transparent",color:tab===key?"#a5b4fc":"#475569",padding:"8px 0 10px",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5 }}>
+              <span>{icon}</span>{label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding:16,maxWidth:520,margin:"0 auto",paddingBottom:80 }}>
+        {loading ? <Spinner/> : (
+          <>
+            {tab==="tasks"&&<TaskList tasks={tasks} onToggle={toggleDone} onEdit={setModal} onAdd={()=>openNew()}/>}
+            {tab==="calendar"&&<CalendarView tasks={tasks} onDayClick={(ds,dt)=>setDaySheet({dateStr:ds,tasks:dt})}/>}
+            {tab==="dash"&&<Dashboard tasks={tasks}/>}
+          </>
+        )}
+      </div>
+      {tab!=="tasks"&&(
+        <button onClick={()=>openNew()} style={{ position:"fixed",bottom:24,right:24,background:"linear-gradient(135deg,#6366f1,#8b5cf6)",width:52,height:52,borderRadius:"50%",border:"none",color:"#fff",fontSize:26,cursor:"pointer",boxShadow:"0 8px 24px #6366f155",display:"flex",alignItems:"center",justifyContent:"center" }}>+</button>
+      )}
+      {modal&&<Modal task={modal} onSave={saveTask} onClose={()=>setModal(null)} onDelete={deleteTask} saving={saving}/>}
+      {daySheet&&<DaySheet dateStr={daySheet.dateStr} tasks={daySheet.tasks} onClose={()=>setDaySheet(null)} onEdit={setModal} onToggle={toggleDone} onAdd={openNew}/>}
+    </div>
+  );
+}
 
     // ─────────────────────────────────────────────
     // ROOT — PIN GATE
